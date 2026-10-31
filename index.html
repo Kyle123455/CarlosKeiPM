@@ -576,7 +576,7 @@ body{
           <p class="eyebrow">PLEASE SAVE THE DATE</p>
           <h3>Carlos Kei's First Birthday</h3>
           <div class="event-row"><span>DATE</span><b>Sunday, 13 December 2026</b></div>
-          <div class="event-row"><span>TIME</span><b>12 noon</b></div>
+          <div class="event-row"><span>TIME</span><b>12:00 noon</b></div>
           <div class="event-row"><span>VENUE</span><b>Sierra Hotel, Dumaguete</b></div>
           <a class="button navy-button" id="mapLink" href="https://www.google.com/maps/search/?api=1&query=Sierra+Hotel+Dumaguete" target="_blank" rel="noopener">Get directions <span>↗</span></a>
           <p class="small-note">Tap the button to open directions in Google Maps.</p>
@@ -628,7 +628,7 @@ body{
           <label>Number of guests<input name="guests" type="number" min="1" max="20" value="1" required></label>
           <label>Message for Carlos Kei <textarea name="message" rows="3" placeholder="Leave a birthday wish (optional)"></textarea></label>
           <button type="submit" class="button navy-button">Submit RSVP <span>↗</span></button>
-          <small id="formMessage">Demo form: connect a form service before sharing this invitation publicly.</small>
+          <small id="formMessage">Your RSVP details will be sent securely to the event organiser.</small>
         </form>
         <a class="registry-link" href="#" id="registryLink">Gift Registry <span>↗</span></a>
       </div>
@@ -841,15 +841,20 @@ body{
       });
     }
 
-    /* ---------- 5. RSVP ---------- */
-    var form    = document.getElementById('rsvpForm');
+    /* ---------- 5. RSVP — Google Apps Script ---------- */
+    var form = document.getElementById('rsvpForm');
     var message = document.getElementById('formMessage');
+    var submitButton = form ? form.querySelector('button[type="submit"]') : null;
+    var RSVP_ENDPOINT = 'https://script.google.com/macros/s/AKfycbzvvYvxzH1w4jXBnjRmQlFe81YnwK7xAG0rr2TkkWuC1PQV_I0gU-xd-4VtaOnR_JBxTg/exec';
 
     if (form) {
       form.addEventListener('submit', function (e) {
         e.preventDefault();
-        var name   = form.elements['name'].value.trim();
-        var attend = form.elements['attendance'].value;
+
+        var name = form.elements['name'].value.trim();
+        var attendance = form.elements['attendance'].value;
+        var guests = Number(form.elements['guests'].value);
+        var note = form.elements['message'].value.trim();
 
         if (!name) {
           message.className = 'error';
@@ -857,33 +862,63 @@ body{
           form.elements['name'].focus();
           return;
         }
-        if (!attend) {
+
+        if (!attendance) {
           message.className = 'error';
           message.textContent = 'Please choose whether you will join us.';
           form.elements['attendance'].focus();
           return;
         }
 
+        if (!Number.isInteger(guests) || guests < 1 || guests > 20) {
+          message.className = 'error';
+          message.textContent = 'Please enter between 1 and 20 guests.';
+          form.elements['guests'].focus();
+          return;
+        }
+
         var data = {
           name: name,
-          attendance: attend,
-          guests: form.elements['guests'].value,
-          message: form.elements['message'].value,
+          attendance: attendance,
+          guests: guests,
+          message: note,
           submitted: new Date().toISOString()
         };
 
-        try {
-          var saved = JSON.parse(localStorage.getItem('ckpm_rsvps') || '[]');
-          saved.push(data);
-          localStorage.setItem('ckpm_rsvps', JSON.stringify(saved));
-        } catch (err) { /* ignore */ }
+        if (submitButton) {
+          submitButton.disabled = true;
+          submitButton.style.opacity = '0.65';
+        }
+        message.className = '';
+        message.textContent = 'Submitting your RSVP…';
 
-        message.className = 'success';
-        message.textContent = attend === 'Joyfully accepts'
-          ? 'Thank you, ' + name + ' — we can\u2019t wait to celebrate with you.'
-          : 'Thank you for letting us know, ' + name + '. You will be missed.';
-
-        form.reset();
+        /*
+         * Google Apps Script web apps can be awkward with browser CORS.
+         * A simple text/plain POST avoids a JSON preflight. With no-cors,
+         * the browser does not expose Google's response to this page, so
+         * the confirmation below means the request was sent—not that the
+         * spreadsheet write was independently verified.
+         */
+        fetch(RSVP_ENDPOINT, {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify(data)
+        }).then(function () {
+          message.className = 'success';
+          message.textContent = attendance === 'Joyfully accepts'
+            ? 'Thank you, ' + name + ' — your RSVP has been sent. We can’t wait to celebrate with you.'
+            : 'Thank you, ' + name + ' — your RSVP has been sent. You will be missed.';
+          form.reset();
+        }).catch(function () {
+          message.className = 'error';
+          message.textContent = 'We couldn’t send your RSVP. Please check your internet connection and try again.';
+        }).finally(function () {
+          if (submitButton) {
+            submitButton.disabled = false;
+            submitButton.style.opacity = '';
+          }
+        });
       });
     }
   }
