@@ -78,11 +78,14 @@ body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opa
     linear-gradient(160deg,#f6efe2 0%,#e6dcc8 100%);
   display:flex;align-items:center;justify-content:center;
   transition:opacity 1s ease,visibility 1s ease;
+  cursor:pointer;
+  pointer-events:auto;
 }
 #envelope-overlay.hidden{opacity:0;visibility:hidden;pointer-events:none}
-.envelope-stage{text-align:center;cursor:pointer;perspective:1600px;user-select:none;-webkit-tap-highlight-color:transparent;padding:20px}
+.envelope-stage{text-align:center;cursor:pointer;pointer-events:auto;perspective:1600px;user-select:none;-webkit-tap-highlight-color:transparent;padding:20px}
 .envelope{position:relative;width:min(420px,86vw);aspect-ratio:420/280;margin:0 auto;transform-style:preserve-3d;transition:transform .9s cubic-bezier(.22,.82,.28,1)}
 .envelope-stage:hover .envelope{transform:rotateX(3deg) translateY(-4px)}
+#envelope-overlay:focus-visible .envelope{outline:2px solid var(--gold);outline-offset:8px}
 
 /* Envelope Body (Outer) */
 .env-back{position:absolute;inset:0;background:linear-gradient(180deg,#1b3556 0%,#10233a 55%,#0b1a2d 100%);border-radius:4px;box-shadow:var(--sh-lg),inset 0 0 60px rgba(0,0,0,.35)}
@@ -654,7 +657,13 @@ body{
    ========================================================= */
 (function () {
   'use strict';
-  document.addEventListener('DOMContentLoaded', init);
+  // The script is at the end of the document, but this also supports
+  // moving it to the head or loading it after the page has already parsed.
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init, { once: true });
+  } else {
+    init();
+  }
 
   function init() {
 
@@ -663,8 +672,13 @@ body{
     var stage   = document.getElementById('envelopeStage');
     var page    = document.getElementById('page');
     var opened  = false;
+    if (!overlay || !page) return;
 
-    var already = sessionStorage.getItem('ckpm_opened') === '1';
+    // Storage can be disabled in private browsing or by browser settings.
+    // Never let a storage error prevent the envelope click handler working.
+    var already = false;
+    try { already = window.sessionStorage.getItem('ckpm_opened') === '1'; }
+    catch (storageError) { already = false; }
     if (already) {
       overlay.classList.add('hidden');
       page.classList.add('revealed');
@@ -700,19 +714,31 @@ body{
 
       overlay.classList.add('opening');
       page.classList.add('revealed');
-      sessionStorage.setItem('ckpm_opened', '1');
+      try { window.sessionStorage.setItem('ckpm_opened', '1'); }
+      catch (storageError) { /* Opening must work even if storage is blocked. */ }
       setTimeout(function () {
         overlay.classList.add('hidden');
         document.body.style.overflow = 'auto';
       }, 1400);
     }
 
+    // Listen on the full overlay, not just the inner envelope stage.
+    // This makes the whole opening screen respond to mouse, touch and keyboard.
+    overlay.addEventListener('click', openEnvelope);
     if (stage) {
-      stage.addEventListener('click', openEnvelope);
-      overlay.addEventListener('keydown', function (e) {
-        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openEnvelope(); }
+      stage.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          openEnvelope();
+        }
       });
     }
+    overlay.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        openEnvelope();
+      }
+    });
 
     var heroBtn = document.getElementById('openInvite');
     if (heroBtn) {
@@ -845,8 +871,7 @@ body{
     var form = document.getElementById('rsvpForm');
     var message = document.getElementById('formMessage');
     var submitButton = form ? form.querySelector('button[type="submit"]') : null;
-    var RSVP_ENDPOINT = 'https://script.google.com/macros/s/AKfycbxbosy4A0OGvltiZWSlrVwmfmGKhrmYBN991Jfdg7fTcng_k1kBGpmyrW_X0HhVF82VGw/exec
-';
+    var RSVP_ENDPOINT = 'https://script.google.com/macros/s/AKfycbxbosy4A0OGvltiZWSlrVwmfmGKhrmYBN991Jfdg7fTcng_k1kBGpmyrW_X0HhVF82VGw/exec';
 
     if (form) {
       form.addEventListener('submit', function (e) {
