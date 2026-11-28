@@ -812,8 +812,11 @@ img.gift-item-img {
               <option>Regretfully declines</option>
             </select>
           </label>
-          <label for="rsvp-guests">Number of guests
+          <label for="rsvp-guests">Number of adults
             <input id="rsvp-guests" name="guests" type="number" min="1" max="20" value="1" required inputmode="numeric">
+          </label>
+          <label for="rsvp-kids">Number of kids
+            <input id="rsvp-kids" name="kids" type="number" min="0" max="20" value="0" required inputmode="numeric">
           </label>
           <label for="rsvp-message">Message for Carlos Kei
             <textarea id="rsvp-message" name="message" rows="3" placeholder="Leave a birthday &amp; christening wish (optional)"></textarea>
@@ -1058,6 +1061,7 @@ img.gift-item-img {
         var name = form.elements['name'].value.trim();
         var attendance = form.elements['attendance'].value;
         var guests = Number(form.elements['guests'].value);
+        var kids = Number(form.elements['kids'].value);
         var note = form.elements['message'].value.trim();
 
         if (!name) {
@@ -1078,12 +1082,19 @@ img.gift-item-img {
           form.elements['guests'].focus();
           return;
         }
+        if (!Number.isInteger(kids) || kids < 0 || kids > 20) {
+          message.className = 'error';
+          message.textContent = 'Please enter between 0 and 20 kids.';
+          form.elements['kids'].focus();
+          return;
+        }
 
         var data = {
           event: 'Birthday & Christening (Guests)',
           name: name,
           attendance: attendance,
           guests: guests,
+          kids: kids,
           message: note,
           submitted: new Date().toISOString()
         };
